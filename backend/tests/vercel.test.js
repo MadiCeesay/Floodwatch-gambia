@@ -4,7 +4,7 @@ import request from 'supertest';
 const mocks = vi.hoisted(() => ({ loadEnv: vi.fn(), connectDatabase: vi.fn(), createApp: vi.fn() }));
 vi.mock('../src/config/env.js', () => ({ loadEnv: mocks.loadEnv }));
 vi.mock('../src/config/database.js', () => ({ connectDatabase: mocks.connectDatabase }));
-vi.mock('../src/app.js', () => ({ createApp: mocks.createApp }));
+vi.mock('../src/createApp.js', () => ({ createApp: mocks.createApp }));
 
 beforeEach(() => {
   vi.resetModules();
@@ -17,7 +17,10 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 it('shares cold-start initialization across concurrent requests and preserves API paths', async () => {
-  const { default: app } = await import('../index.js');
+  // Exercise the exact module selected by Vercel in production.
+  const { default: app } = await import('../src/app.js');
+  expect(typeof app).toBe('function');
+  expect((await import('../index.js')).default).toBe(app);
   const responses = await Promise.all([
     request(app).get('/api/health'), request(app).get('/api/v1/safety'),
   ]);

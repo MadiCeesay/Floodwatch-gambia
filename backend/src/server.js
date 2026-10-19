@@ -1,6 +1,6 @@
 import { loadEnv } from './config/env.js';
 import { connectDatabase, closeDatabase } from './config/database.js';
-import { createApp } from './app.js';
+import { createApp } from './createApp.js';
 
 let server;
 async function shutdown() {

@@ -7,7 +7,8 @@ same repository. The Express backend does not serve the React website.
 
 - Root Directory: `backend`
 - Framework Preset: Express
-- Entry point: `index.js` (exports an Express application)
+- Entry point: `src/app.js` (exports an Express application); `index.js` re-exports
+  the same handler. The reusable application factory lives in `src/createApp.js`.
 - Node.js: 24.x, matching local verification
 - Leave build/output overrides at the Express defaults.
 

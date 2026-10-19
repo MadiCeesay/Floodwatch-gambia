@@ -2,7 +2,7 @@ import { beforeAll, afterAll, beforeEach, describe, it, expect, vi } from 'vites
 import request from 'supertest';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/createApp.js';
 import { connectDatabase, closeDatabase } from '../src/config/database.js';
 import { FloodReport } from '../src/models/FloodReport.js';
 import { AuditLog } from '../src/models/AuditLog.js';
