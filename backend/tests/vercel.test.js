@@ -26,8 +26,22 @@ it('shares cold-start initialization across concurrent requests and preserves AP
   ]);
   expect(responses.map(r => r.status)).toEqual([200, 200]);
   expect(responses[1].body.path).toBe('/api/v1/safety');
-  expect(mocks.connectDatabase).toHaveBeenCalledTimes(1);
+  expect(mocks.connectDatabase).toHaveBeenCalledTimes(2);
   expect(mocks.createApp).toHaveBeenCalledTimes(1);
+});
+
+it('waits for the database before creating or invoking routes', async () => {
+  let connected;
+  mocks.connectDatabase.mockReturnValueOnce(new Promise(resolve => { connected = resolve; }));
+  const { default: app } = await import('../src/app.js');
+  const response = request(app).get('/api/health').then(value => value);
+  try {
+    await vi.waitFor(() => expect(mocks.connectDatabase).toHaveBeenCalledTimes(1));
+    expect(mocks.createApp).not.toHaveBeenCalled();
+  } finally {
+    connected();
+  }
+  expect((await response).status).toBe(200);
 });
 
 it('returns a safe response for missing configuration and retries after correction', async () => {
@@ -46,4 +60,24 @@ it('retries a failed database connection on the next request', async () => {
   expect((await request(app).get('/api/health')).status).toBe(503);
   expect((await request(app).get('/api/health')).status).toBe(200);
   expect(mocks.connectDatabase).toHaveBeenCalledTimes(2);
+});
+
+it('checks MongoDB on warm requests and recovers without rebuilding routes', async () => {
+  const route = vi.fn((req, res) => res.json({ path: req.url }));
+  mocks.createApp.mockReturnValue(route);
+  const { default: app } = await import('../src/app.js');
+  expect((await request(app).get('/api/health')).status).toBe(200);
+
+  mocks.connectDatabase.mockRejectedValueOnce(new Error('private connection details'));
+  const unavailable = await request(app).get('/api/v1/reports');
+  expect(unavailable.status).toBe(503);
+  expect(unavailable.headers['cache-control']).toBe('no-store');
+  expect(unavailable.headers['x-powered-by']).toBeUndefined();
+  expect(JSON.stringify(unavailable.body)).not.toContain('private connection details');
+  expect(route).toHaveBeenCalledTimes(1);
+
+  expect((await request(app).get('/api/v1/reports')).status).toBe(200);
+  expect(mocks.connectDatabase).toHaveBeenCalledTimes(3);
+  expect(mocks.createApp).toHaveBeenCalledTimes(1);
+  expect(route).toHaveBeenCalledTimes(2);
 });

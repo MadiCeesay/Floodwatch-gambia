@@ -29,12 +29,20 @@ beforeEach(async () => { await FloodReport.deleteMany({}); await AuditLog.delete
 afterAll(async () => { await closeDatabase(); await mongo?.stop(); });
 const admin = req => req.set('Authorization', `Bearer ${token}`);
 describe('core MongoDB workflow', () => {
-  it('starts the production entry point and serves live health and report requests', async () => {
+  it.each(['local server', 'Vercel default export'])('serves live health, reports and authentication through the %s', async mode => {
     const probe = createServer();
     await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
     const port = probe.address().port;
     await new Promise(resolve => probe.close(resolve));
-    const child = spawn(process.execPath, ['src/server.js'], { cwd: process.cwd(), windowsHide: true,
+    // The test supplies the HTTP listener for Vercel's exported app, just as
+    // the platform does. The production entry point never calls listen().
+    const args = mode === 'local server' ? ['src/server.js'] : ['--input-type=module', '--eval', `
+      import app from './src/app.js';
+      import { closeDatabase } from './src/config/database.js';
+      const server = app.listen(Number(process.env.PORT));
+      process.once('SIGTERM', () => server.close(() => closeDatabase()));
+    `];
+    const child = spawn(process.execPath, args, { cwd: process.cwd(), windowsHide: true,
       env: { ...process.env, NODE_ENV: 'test', MONGODB_URI: mongo.getUri(), JWT_SECRET: 'smoke-test-only-secret-longer-than-32-characters', PORT: String(port) },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -49,7 +57,17 @@ describe('core MongoDB workflow', () => {
       }, { timeout: 15000, interval: 100 });
       const response = await fetch(`http://127.0.0.1:${port}/api/v1/reports`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(base) });
       expect(response.status).toBe(201);
-      expect(output).toContain('MongoDB connected');
+      const login = await fetch(`http://127.0.0.1:${port}/api/v1/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@example.test', password }),
+      });
+      expect(login.status).toBe(200);
+      const { data } = await login.json();
+      const dashboard = await fetch(`http://127.0.0.1:${port}/api/v1/admin/dashboard`, {
+        headers: { Authorization: `Bearer ${data.token}` },
+      });
+      expect(dashboard.status).toBe(200);
+      if (mode === 'local server') expect(output).toContain('MongoDB connected');
     } finally {
       if (child.exitCode === null) { const ended = new Promise(resolve => child.once('exit', resolve)); child.kill('SIGTERM'); await ended; }
     }
