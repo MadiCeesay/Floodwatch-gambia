@@ -6,16 +6,20 @@ same repository. The Express backend does not serve the React website.
 ## Backend project
 
 - Root Directory: `backend`
-- Framework Preset: Express
-- Entry point: `src/app.js` (exports an Express application); `index.js` re-exports
-  the same handler. The reusable application factory lives in `src/createApp.js`.
+- Framework Preset: **Other** (enforced by `"framework": null` in `backend/vercel.json`)
+- Entry point: `api/index.js`, a default-exported async Node request handler.
+- `vercel.json` rewrites incoming requests to this function while preserving
+  public URLs such as `/api/health` and `/api/v1/reports`.
+- `src/app.js` is an internal factory re-export. Local `npm start` / `npm run dev`
+  continue using `src/server.js`; all routes stay in `src/createApp.js`.
 - Node.js: 24.x, matching local verification
-- Leave build/output overrides at the Express defaults.
+- Clear any previous Express build/output overrides. No custom build is needed.
 
 Set these environment variables in Vercel for the deployment environment:
 
 ```text
 NODE_ENV=production
+NODEJS_HELPERS=0
 MONGODB_URI=<your Atlas connection string>
 JWT_SECRET=<a random secret of at least 32 characters>
 FRONTEND_URL=https://<your frontend domain>
@@ -23,6 +27,20 @@ CLOUDINARY_CLOUD_NAME=<your cloud name>
 CLOUDINARY_API_KEY=<your API key>
 CLOUDINARY_API_SECRET=<your API secret>
 ```
+
+`NODEJS_HELPERS=0` must be set in the Vercel project's environment variables for
+both build and runtime, then redeployed. It disables Vercel's automatic request
+body parsing so Express's JSON size limit and Multer's photo/voice parsing can
+read the original stream. This is the documented [Node helpers setting](https://vercel.com/docs/functions/runtimes/node-js/advanced-node-configuration#disabling-helpers-for-nodejs).
+
+The handler validates configuration and calls the existing connection helper on
+every invocation. Healthy database connections and the Express app are reused;
+failed connections can be retried. It never opens a listening socket or closes
+the database after a request.
+
+`JWT_EXPIRES_IN`, `PUBLIC_REPORT_RATE_LIMIT_WINDOW_MS`,
+`PUBLIC_REPORT_RATE_LIMIT_MAX`, and `TRUST_PROXY_HOPS` remain optional with their
+existing validated defaults. `PORT` is used only by the local/standalone listener.
 
 Local `.env` files are ignored by Git and are not automatically available in
 Vercel. Do not copy admin seed credentials to the deployment: provision the

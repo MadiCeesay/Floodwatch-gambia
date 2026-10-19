@@ -37,13 +37,24 @@ describe('core MongoDB workflow', () => {
     // The test supplies the HTTP listener for Vercel's exported app, just as
     // the platform does. The production entry point never calls listen().
     const args = mode === 'local server' ? ['src/server.js'] : ['--input-type=module', '--eval', `
-      import app from './src/app.js';
+      import { createServer } from 'node:http';
+      import handler from './api/index.js';
       import { closeDatabase } from './src/config/database.js';
-      const server = app.listen(Number(process.env.PORT));
+      import { v2 as cloudinary } from 'cloudinary';
+      // Exercise the real multipart/storage pipeline without external writes.
+      cloudinary.uploader.upload_stream = (options, callback) => ({
+        end() { callback(null, {
+          secure_url: 'https://storage.example.test/' + options.resource_type,
+          public_id: 'test/' + options.resource_type,
+        }); },
+      });
+      const server = createServer(handler).listen(Number(process.env.PORT));
       process.once('SIGTERM', () => server.close(() => closeDatabase()));
     `];
     const child = spawn(process.execPath, args, { cwd: process.cwd(), windowsHide: true,
-      env: { ...process.env, NODE_ENV: 'test', MONGODB_URI: mongo.getUri(), JWT_SECRET: 'smoke-test-only-secret-longer-than-32-characters', PORT: String(port) },
+      env: { ...process.env, NODE_ENV: 'test', MONGODB_URI: mongo.getUri(), JWT_SECRET: 'smoke-test-only-secret-longer-than-32-characters', PORT: String(port),
+        NODEJS_HELPERS: '0', CLOUDINARY_CLOUD_NAME: 'test', CLOUDINARY_API_KEY: 'test', CLOUDINARY_API_SECRET: 'test',
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let output = '';
@@ -67,6 +78,33 @@ describe('core MongoDB workflow', () => {
         headers: { Authorization: `Bearer ${data.token}` },
       });
       expect(dashboard.status).toBe(200);
+      const oversized = await fetch(`http://127.0.0.1:${port}/api/v1/reports`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...base, description: 'x'.repeat(40 * 1024) }),
+      });
+      expect(oversized.status).toBe(413);
+      if (mode === 'Vercel default export') {
+        const form = new FormData();
+        form.set('latitude', String(base.latitude));
+        form.set('longitude', String(base.longitude));
+        form.set('locationSource', 'gps');
+        const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aH9sAAAAASUVORK5CYII=', 'base64');
+        const wav = Buffer.alloc(44);
+        wav.write('RIFF'); wav.writeUInt32LE(36, 4); wav.write('WAVE', 8); wav.write('fmt ', 12);
+        form.set('photo', new Blob([png], { type: 'image/png' }), 'flood.png');
+        form.set('voiceRecording', new Blob([wav], { type: 'audio/wav' }), 'message.wav');
+        const media = await fetch(`http://127.0.0.1:${port}/api/v1/reports`, { method: 'POST', body: form });
+        expect(media.status).toBe(201);
+        const { data: report } = await media.json();
+        expect(report.reportMethod).toBe('mixed');
+        expect(report.photo.url).toBe('https://storage.example.test/image');
+        expect(report.voiceRecording).toBeUndefined();
+        const detail = await fetch(`http://127.0.0.1:${port}/api/v1/admin/reports/${report.id}`, {
+          headers: { Authorization: `Bearer ${data.token}` },
+        });
+        expect(detail.status).toBe(200);
+        expect((await detail.json()).data.voiceRecording.url).toBe('https://storage.example.test/video');
+      }
       if (mode === 'local server') expect(output).toContain('MongoDB connected');
     } finally {
       if (child.exitCode === null) { const ended = new Promise(resolve => child.once('exit', resolve)); child.kill('SIGTERM'); await ended; }
