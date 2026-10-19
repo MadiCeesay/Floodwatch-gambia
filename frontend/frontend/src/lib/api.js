@@ -39,23 +39,26 @@ export async function api(
       0,
     );
   }
+  if (response.status === 401 && authenticated)
+    window.dispatchEvent(new Event("auth-expired"));
   let result;
   try {
     result = await response.json();
   } catch {
     throw new ApiError(
-      "The service returned an unexpected response. Please try again.",
+      response.status >= 500
+        ? "The service is unavailable right now. Your changes have been kept. Please try again."
+        : "The service returned an unexpected response. Please try again.",
       response.status,
     );
   }
   if (!response.ok) {
-    if (response.status === 401 && authenticated)
-      window.dispatchEvent(new Event("auth-expired"));
     const message =
       response.status === 429
         ? "Too many attempts. Please wait before trying again."
         : response.status >= 500
-          ? response.status === 503
+          ? response.status === 503 &&
+            path === "/reports" && body instanceof FormData
             ? "Photo or voice storage is unavailable. Your report is still here. Remove the file and add an observation, or try later."
             : "The service is unavailable right now. Your changes have been kept. Please try again."
           : result.error?.message || "Something went wrong. Please try again.";

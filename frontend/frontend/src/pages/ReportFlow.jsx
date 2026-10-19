@@ -80,10 +80,17 @@ export default function ReportFlow() {
       setSaved(rememberReport(response.data.id));
       setResult(response.data);
     } catch (e) {
-      setError(
-        e.message +
-          (e.details?.length ? " Check your entries and try again." : ""),
-      );
+      const fieldNames = {
+        description: "Description", latitude: "Flood location",
+        longitude: "Flood location", locationSource: "Flood location",
+        community: "Community", reporterContact: "Contact details",
+        waterLevel: "Water level", roadCondition: "Road condition",
+        homesAffected: "Homes affected", peopleNeedHelp: "People needing help",
+      };
+      const details = e.details
+        ?.map(detail => `${fieldNames[detail.field] || "Report"}: ${detail.message}`)
+        .join(" ");
+      setError(details ? `${e.message}. ${details}` : e.message);
     } finally {
       setBusy(false);
       guard.current = false;

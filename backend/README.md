@@ -25,6 +25,8 @@ Invoke-RestMethod http://localhost:5000/api/health
 
 Seeding is idempotent and never resets an existing account. There is no public registration. Remove seed credentials from the runtime environment after provisioning. `npm run dev` enables Node's watch mode.
 
+If seeding fails, the command identifies invalid admin fields or the failing stage (application configuration, database connection, or administrator creation) without printing credentials. Correct the indicated settings in `backend/.env` and rerun `npm run seed:admin`. Quote `.env` passwords containing `#` so dotenv preserves the symbol rather than treating it as a comment. Existing PowerShell `$env:ADMIN_*` values override `.env`; update or remove those overrides if edits appear to have no effect.
+
 All startup configuration is validated. MongoDB and a 32-character minimum JWT secret are required in every environment. Development supports reporting without Cloudinary; production requires all three Cloudinary settings. A failed database connection stops startup. SIGINT/SIGTERM drain HTTP requests and close MongoDB. Readiness returns 503 when disconnected.
 
 ## React integration

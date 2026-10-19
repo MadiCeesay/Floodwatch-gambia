@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "../support/observed-test";
 import AxeBuilder from "@axe-core/playwright";
 const api = "http://127.0.0.1:5011/api/v1";
 async function newReport(request, extras = {}) {
@@ -162,7 +163,7 @@ test("previews a real photo and handles unavailable media storage without losing
   await page
     .getByLabel("A few words, if you like")
     .fill("Water at the road crossing");
-  await page.getByLabel("Add a photo", { exact: true }).setInputFiles({
+  await page.getByLabel("Choose from gallery", { exact: true }).setInputFiles({
     name: "flood.png",
     mimeType: "image/png",
     buffer: Buffer.from(

@@ -3,17 +3,15 @@ import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-import { createApp } from "../../../backend/src/app.js";
-import { loadEnv } from "../../../backend/src/config/env.js";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   connectDatabase,
   closeDatabase,
-} from "../../../backend/src/config/database.js";
-import { seedAdmin } from "../../../backend/src/seed/seedAdmin.js";
-import { FloodReport } from "../../../backend/src/models/FloodReport.js";
-import { User } from "../../../backend/src/models/User.js";
+} from "../../../../backend/src/config/database.js";
+const backendDirectory = new URL("../../../../backend/", import.meta.url);
 const require = createRequire(
-  new URL("../../../backend/package.json", import.meta.url),
+  new URL("package.json", backendDirectory),
 );
 const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const installed =
@@ -37,24 +35,42 @@ const mongo = await MongoMemoryReplSet.create({
   replSet: { count: 1 },
 });
 await connectDatabase(mongo.getUri());
+// Database buffering is disabled: load seed models after connecting, not while
+// awaiting creation of the temporary MongoDB server.
+const { seedAdmin } = await import("../../../../backend/src/seed/seedAdmin.js");
+const { FloodReport } = await import("../../../../backend/src/models/FloodReport.js");
+const { User } = await import("../../../../backend/src/models/User.js");
 await Promise.all([FloodReport.init(), User.init()]);
 await seedAdmin({
   name: "Browser Test Administrator",
   email: "browser@example.test",
   password: "Browser-Test-Only42!",
 });
-const env = loadEnv({
+const env = {
+  ...process.env,
   NODE_ENV: "test",
   MONGODB_URI: mongo.getUri(),
   JWT_SECRET: randomBytes(48).toString("hex"),
   FRONTEND_URL: "http://127.0.0.1:4173",
-  PUBLIC_REPORT_RATE_LIMIT_MAX: 1000,
+  PORT: "5011",
+  PUBLIC_REPORT_RATE_LIMIT_MAX: "1000",
+  // Exercise the real unconfigured-storage path; never use operator credentials.
+  CLOUDINARY_CLOUD_NAME: "",
+  CLOUDINARY_API_KEY: "",
+  CLOUDINARY_API_SECRET: "",
+};
+const server = spawn(process.execPath, ["src/server.js"], {
+  cwd: fileURLToPath(backendDirectory), env, windowsHide: true, stdio: "inherit",
 });
-const server = createApp(env).listen(5011, "127.0.0.1", () =>
-  console.info("Isolated browser test API ready"),
-);
+server.once("exit", code => { if (!stopping) process.exit(code || 1); });
+let stopping = false;
 async function stop() {
-  await new Promise((resolve) => server.close(resolve));
+  stopping = true;
+  if (server.exitCode === null) {
+    const exited = new Promise(resolve => server.once("exit", resolve));
+    server.kill("SIGTERM");
+    await exited;
+  }
   await closeDatabase();
   await mongo.stop();
 }

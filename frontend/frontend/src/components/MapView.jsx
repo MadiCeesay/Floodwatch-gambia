@@ -34,12 +34,14 @@ function MapController({ location, reports, picker, onPick }) {
   }, [location, reports, map]);
   useMapEvents({
     click: (e) => {
-      if (picker)
+      if (picker) {
+        const point = map.wrapLatLng(e.latlng);
         onPick({
-          latitude: e.latlng.lat,
-          longitude: e.latlng.lng,
+          latitude: point.lat,
+          longitude: point.lng,
           locationSource: "map",
         });
+      }
     },
   });
   return null;
@@ -55,7 +57,7 @@ export default function MapView({
 }) {
   const mapRef = useRef(null);
   function chooseCenter() {
-    const center = mapRef.current?.getCenter();
+    const center = mapRef.current?.getCenter().wrap();
     if (center)
       onPick({
         latitude: center.lat,

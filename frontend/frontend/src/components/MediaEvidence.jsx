@@ -184,9 +184,20 @@ export default function MediaEvidence({
           <Camera size={25} />
           <strong>Show what you see</strong>
           <label className="button secondary file-button">
-            {processing ? "Preparing photo…" : "Add a photo"}
+            {processing ? "Preparing photo…" : "Choose from gallery"}
             <input
-              aria-label="Add a photo"
+              aria-label="Choose from gallery"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={choosePhoto}
+              disabled={processing || recording || requestingMicrophone}
+            />
+          </label>
+          <label className="text-button file-button">
+            <Camera size={15} />
+            Take a photo
+            <input
+              aria-label="Take a photo"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               capture="environment"

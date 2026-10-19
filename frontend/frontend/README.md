@@ -2,13 +2,15 @@
 
 React 19 + Vite, React Router, Leaflet/React Leaflet and Lucide icons. The interface connects to the existing Express backend; there are no production mock responses, reports, counts, alerts or locations.
 
-## Verified implementation
+## Earlier frontend implementation verification
+
+The following records the original frontend implementation. See [the integration audit](../../INTEGRATION.md) for the current endpoint inventory, fixes, 36 backend tests, 19 browser scenarios and the supplemental authority-map check.
 
 The final run passed **13 Playwright browser tests** against the real Express API and an isolated MongoDB replica set. `npm run lint` and `npm run build` passed. Normal-flow browser inspection of Home, Map and Safety recorded no console errors and successful API responses. Responsive checks covered 320, 375, 390, 430, 768, 1024 and 1440 px without horizontal page overflow; evidence-step and authority layouts received additional checks. Desktop/mobile screenshots were visually inspected. Axe found no serious or critical violations on the checked citizen screens, excluding Leaflet's generated map. Microphone recording was verified using a synthetic browser microphone; physical-device and screen-reader checks remain necessary. Live Cloudinary success was not tested without credentials.
 
 ## Run both applications
 
-Use Node.js 22.12+ (verified with Node 24). Configure and start the backend first, following [its setup instructions](../backend/README.md). It needs MongoDB Atlas or a replica set, a strong JWT secret and a seeded administrator. Do not put backend secrets in this frontend.
+Use Node.js 22.12+ (verified with Node 24). The active frontend is nested at `frontend/frontend/`. Configure and start the backend first, following [its setup instructions](../../backend/README.md). It needs MongoDB Atlas or a replica set, a strong JWT secret and a seeded administrator. Do not put backend secrets in this frontend. See the current [integration audit](../../INTEGRATION.md) for endpoint mappings and verification evidence.
 
 ```powershell
 # Terminal 1, after configuring backend/.env
@@ -18,7 +20,7 @@ npm run seed:admin
 npm start
 
 # Terminal 2
-cd frontend
+cd frontend/frontend
 npm ci
 Copy-Item .env.example .env
 npm run dev

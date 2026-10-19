@@ -27,19 +27,23 @@ export function AuthProvider({ children }) {
     window.addEventListener("auth-expired", expire);
     const token = initialToken;
     let cancelled = false;
+    const controller = new AbortController();
     if (token) {
       setAccessToken(token);
-      api("/auth/me", { authenticated: true })
+      api("/auth/me", { authenticated: true, signal: controller.signal })
         .then((result) => {
           if (!cancelled) setUser(result.data);
         })
-        .catch(expire)
+        .catch(() => {
+          if (!cancelled) expire();
+        })
         .finally(() => {
           if (!cancelled) setChecking(false);
         });
     }
     return () => {
       cancelled = true;
+      controller.abort();
       window.removeEventListener("auth-expired", expire);
     };
   }, [initialToken]);
