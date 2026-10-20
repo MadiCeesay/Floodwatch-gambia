@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url";
 import {
   connectDatabase,
   closeDatabase,
-} from "../../../../backend/src/config/database.js";
-const backendDirectory = new URL("../../../../backend/", import.meta.url);
+} from "../../../backend/src/config/database.js";
+const backendDirectory = new URL("../../../backend/", import.meta.url);
 const require = createRequire(
   new URL("package.json", backendDirectory),
 );
@@ -37,9 +37,9 @@ const mongo = await MongoMemoryReplSet.create({
 await connectDatabase(mongo.getUri());
 // Database buffering is disabled: load seed models after connecting, not while
 // awaiting creation of the temporary MongoDB server.
-const { seedAdmin } = await import("../../../../backend/src/seed/seedAdmin.js");
-const { FloodReport } = await import("../../../../backend/src/models/FloodReport.js");
-const { User } = await import("../../../../backend/src/models/User.js");
+const { seedAdmin } = await import("../../../backend/src/seed/seedAdmin.js");
+const { FloodReport } = await import("../../../backend/src/models/FloodReport.js");
+const { User } = await import("../../../backend/src/models/User.js");
 await Promise.all([FloodReport.init(), User.init()]);
 await seedAdmin({
   name: "Browser Test Administrator",
