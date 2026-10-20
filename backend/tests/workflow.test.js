@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, beforeEach, describe, it, expect, vi } from 'vitest';
+ import { beforeAll, afterAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
@@ -38,7 +38,7 @@ describe('core MongoDB workflow', () => {
     // the platform does. The production entry point never calls listen().
     const args = mode === 'local server' ? ['src/server.js'] : ['--input-type=module', '--eval', `
       import { createServer } from 'node:http';
-      import handler from './api/index.js';
+      import handler from './src/app.js';
       import { closeDatabase } from './src/config/database.js';
       import { v2 as cloudinary } from 'cloudinary';
       // Exercise the real multipart/storage pipeline without external writes.
@@ -215,3 +215,4 @@ describe('core MongoDB workflow', () => {
     expect(response.body.data.guidance.length).toBeGreaterThan(0);
   });
 });
+
